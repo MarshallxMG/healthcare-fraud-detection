@@ -150,23 +150,29 @@ def get_db():
 # =============================================================================
 # DATABASE SEEDING (For Render deployment)
 # =============================================================================
-async def run_seeding_logic(db: Session, force: bool = False):
-    """Shared seeding logic."""
+# =============================================================================
+# DATABASE SEEDING (For Render deployment)
+# =============================================================================
+import threading
+
+def run_seeding_logic_sync(force: bool = False):
+    """Shared seeding logic (Synchronous for Threading)."""
+    db = SessionLocal()
     try:
         count = db.query(Claim).count()
         if count > 0 and not force:
             print(f"✅ Database contains {count} claims. Skipping seed.")
-            return f"Database already contains {count} claims."
+            return
 
-        print("🌱 Seeding database from CSV...")
+        print("🌱 Seeding database from CSV (Background)...")
         csv_path = os.path.join(BASE_DIR, "data", "claims.csv")
         
         if not os.path.exists(csv_path):
             print(f"⚠️ CSV file not found at {csv_path}")
-            return "CSV file not found."
+            return
 
         # Load CSV in chunks
-        chunk_size = 5000 # Increased chunk size for speed
+        chunk_size = 5000 
         total_loaded = 0
         
         # Read CSV with pandas
@@ -197,30 +203,30 @@ async def run_seeding_logic(db: Session, force: bool = False):
             total_loaded += len(claims_to_add)
             print(f"   Loaded {total_loaded} claims...")
         
-        return f"Successfully seeded {total_loaded} claims."
+        print(f"✅ Successfully seeded {total_loaded} claims!")
             
     except Exception as e:
         print(f"❌ Error seeding database: {e}")
-        return f"Error: {str(e)}"
+    finally:
+        db.close()
 
 @app.on_event("startup")
-async def seed_database():
-    """Seed on startup if empty."""
-    db = SessionLocal()
-    try:
-        await run_seeding_logic(db)
-    finally:
-        db.close()
+async def startup_event():
+    """Start seeding in background on startup."""
+    # Run seeding in a separate thread to not block startup
+    thread = threading.Thread(target=run_seeding_logic_sync, args=(False,))
+    thread.daemon = True
+    thread.start()
+    print("🚀 Startup complete. Seeding running in background.")
 
 @app.get("/seed")
-async def manual_seed(force: bool = False):
+def manual_seed(force: bool = False):
     """Manually trigger database seeding (GET for browser access)."""
-    db = SessionLocal()
-    try:
-        result = await run_seeding_logic(db, force)
-        return {"status": "completed", "message": result}
-    finally:
-        db.close()
+    # Run in background thread to avoid timeout
+    thread = threading.Thread(target=run_seeding_logic_sync, args=(force,))
+    thread.daemon = True
+    thread.start()
+    return {"status": "started", "message": "Seeding started in background. Check logs for progress."}
 
 def save_user_submission(claim_input, result):
     """
