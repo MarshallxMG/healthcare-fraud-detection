@@ -144,6 +144,63 @@ def get_db():
     finally:
         db.close()
 
+# =============================================================================
+# DATABASE SEEDING (For Render deployment)
+# =============================================================================
+@app.on_event("startup")
+async def seed_database():
+    """Seed the database with data from CSV if empty."""
+    db = SessionLocal()
+    try:
+        # Check if database is empty
+        count = db.query(Claim).count()
+        if count == 0:
+            print("🌱 Database is empty. Seeding from CSV...")
+            csv_path = os.path.join(BASE_DIR, "data", "claims.csv")
+            
+            if os.path.exists(csv_path):
+                # Load CSV in chunks to avoid memory issues
+                chunk_size = 1000
+                total_loaded = 0
+                
+                for chunk in pd.read_csv(csv_path, chunksize=chunk_size):
+                    claims_to_add = []
+                    for _, row in chunk.iterrows():
+                        claim = Claim(
+                            claim_id=str(row.get('claim_id', '')),
+                            provider_id=str(row.get('provider_id', '')),
+                            patient_id=str(row.get('patient_id', '')),
+                            claim_type=str(row.get('claim_type', '')),
+                            diagnosis_code=str(row.get('diagnosis_code', '')),
+                            amount=float(row.get('amount', 0)),
+                            deductible=float(row.get('deductible', 0)),
+                            num_diagnoses=int(row.get('num_diagnoses', 1)),
+                            num_procedures=int(row.get('num_procedures', 0)),
+                            length_of_stay=int(row.get('length_of_stay', 0)),
+                            patient_age=int(row.get('patient_age', 0)),
+                            chronic_conditions=int(row.get('chronic_conditions', 0)),
+                            amount_per_diagnosis=float(row.get('amount_per_diagnosis', 0)),
+                            is_fraud=bool(row.get('is_fraud', False)),
+                            timestamp=datetime.utcnow()
+                        )
+                        claims_to_add.append(claim)
+                    
+                    db.add_all(claims_to_add)
+                    db.commit()
+                    total_loaded += len(claims_to_add)
+                    print(f"   Loaded {total_loaded} claims...")
+                
+                print(f"✅ Successfully seeded {total_loaded} claims!")
+            else:
+                print(f"⚠️ CSV file not found at {csv_path}. Skipping seed.")
+        else:
+            print(f"✅ Database already contains {count} claims. Skipping seed.")
+            
+    except Exception as e:
+        print(f"❌ Error seeding database: {e}")
+    finally:
+        db.close()
+
 def save_user_submission(claim_input, result):
     """
     Save user submission to database.
