@@ -212,9 +212,9 @@ async def seed_database():
     finally:
         db.close()
 
-@app.post("/seed")
+@app.get("/seed")
 async def manual_seed(force: bool = False):
-    """Manually trigger database seeding."""
+    """Manually trigger database seeding (GET for browser access)."""
     db = SessionLocal()
     try:
         result = await run_seeding_logic(db, force)
