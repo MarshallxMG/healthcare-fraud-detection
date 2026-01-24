@@ -13,14 +13,23 @@ from typing import List, Dict, Optional
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOSPITAL_CSV = os.path.join(BASE_DIR, "Dataset", "Synthetic Dataset", "indian_hospitals_classified.csv")
 
-# Load hospitals into memory at module load
-print(f"📊 Loading hospitals from: {HOSPITAL_CSV}")
-try:
-    hospitals_df = pd.read_csv(HOSPITAL_CSV, low_memory=False)
-    print(f"✅ Loaded {len(hospitals_df):,} hospitals")
-except Exception as e:
-    print(f"❌ Error loading hospitals: {e}")
-    hospitals_df = pd.DataFrame()
+# Load hospitals into memory lazily
+hospitals_df = pd.DataFrame()
+
+def load_hospitals_data():
+    """Load hospital data if not already loaded."""
+    global hospitals_df
+    if hospitals_df.empty:
+        print(f"📊 Loading hospitals from: {HOSPITAL_CSV}")
+        try:
+            hospitals_df = pd.read_csv(HOSPITAL_CSV, low_memory=False)
+            print(f"✅ Loaded {len(hospitals_df):,} hospitals")
+        except Exception as e:
+            print(f"❌ Error loading hospitals: {e}")
+            hospitals_df = pd.DataFrame()
+
+# Call this function at start of each public function
+
 
 # Available hospital types
 HOSPITAL_TYPES = ["Government", "Clinic", "Private"]
@@ -46,6 +55,8 @@ def get_hospitals_by_type(hospital_type: str, limit: int = 100) -> List[Dict]:
     --------
     List of hospital dictionaries
     """
+    if hospitals_df.empty:
+        load_hospitals_data()
     if hospitals_df.empty:
         return []
     
@@ -83,6 +94,8 @@ def search_hospitals(query: str, hospital_type: Optional[str] = None, limit: int
     --------
     List of matching hospital dictionaries
     """
+    if hospitals_df.empty:
+        load_hospitals_data()
     if hospitals_df.empty or not query:
         return []
     
@@ -127,6 +140,8 @@ def get_hospital_details(hospital_name: str) -> Optional[Dict]:
     Hospital details dictionary or None if not found
     """
     if hospitals_df.empty:
+        load_hospitals_data()
+    if hospitals_df.empty:
         return None
     
     match = hospitals_df[hospitals_df['Hospital_Name'] == hospital_name]
@@ -151,6 +166,8 @@ def get_hospital_details(hospital_name: str) -> Optional[Dict]:
 
 def get_hospital_stats() -> Dict:
     """Get statistics about loaded hospitals."""
+    if hospitals_df.empty:
+        load_hospitals_data()
     if hospitals_df.empty:
         return {"total": 0, "by_type": {}}
     

@@ -210,14 +210,29 @@ def run_seeding_logic_sync(force: bool = False):
     finally:
         db.close()
 
+def run_background_initialization(force_seed: bool = False):
+    """Run all heavy initialization in background."""
+    print("⏳ Starting background initialization...")
+    
+    # 1. Load ML Model
+    load_ml_model()
+    
+    # 2. Load Disease Prices
+    load_disease_prices()
+    
+    # 3. Seed Database
+    run_seeding_logic_sync(force_seed)
+    
+    print("🚀 Background initialization complete!")
+
 @app.on_event("startup")
 async def startup_event():
-    """Start seeding in background on startup."""
-    # Run seeding in a separate thread to not block startup
-    thread = threading.Thread(target=run_seeding_logic_sync, args=(False,))
+    """Start initialization in background on startup."""
+    # Run everything in a separate thread to not block startup
+    thread = threading.Thread(target=run_background_initialization, args=(False,))
     thread.daemon = True
     thread.start()
-    print("🚀 Startup complete. Seeding running in background.")
+    print("🚀 Server started. Initialization running in background.")
 
 @app.get("/seed")
 def manual_seed(force: bool = False):
@@ -322,13 +337,19 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_PATH = os.path.join(BASE_DIR, "ml", "model.pkl")
 model_artifacts = None
 
-# Try to load the pre-trained model
-if os.path.exists(MODEL_PATH):
-    model_artifacts = joblib.load(MODEL_PATH)
-    print(f"✅ Model loaded successfully!")
-    print(f"   Features used: {model_artifacts.get('feature_cols', [])}")
-else:
-    print("⚠️ WARNING: ML Model not found. Using rule-based detection only.")
+def load_ml_model():
+    """Load the ML model artifacts into memory."""
+    global model_artifacts
+    if os.path.exists(MODEL_PATH):
+        try:
+            model_artifacts = joblib.load(MODEL_PATH)
+            print(f"✅ Model loaded successfully!")
+            print(f"   Features used: {model_artifacts.get('feature_cols', [])}")
+        except Exception as e:
+            print(f"⚠️ Error loading ML model: {e}")
+            model_artifacts = None
+    else:
+        print("⚠️ WARNING: ML Model not found. Using rule-based detection only.")
 
 # =============================================================================
 # INDIAN HEALTHCARE PRICING BENCHMARKS
@@ -400,23 +421,31 @@ import pandas as pd
 
 # Load disease prices from CSV (generated from actual claims data)
 DISEASE_PRICES = {}
-disease_prices_path = os.path.join(BASE_DIR, "data", "disease_prices.csv")
 
-try:
-    df_prices = pd.read_csv(disease_prices_path)
-    for _, row in df_prices.iterrows():
-        DISEASE_PRICES[str(row['diagnosis_code'])] = {
-            'base_price': float(row['avg_price']),
-            'median_price': float(row['median_price']),
-            'min_price': float(row['min_price']),
-            'max_price': float(row['max_price']),
-            'claim_count': int(row['claim_count']),
-            'fraud_rate': float(row['fraud_rate'])
-        }
-    print(f"✅ Loaded prices for {len(DISEASE_PRICES)} diagnoses")
-except Exception as e:
-    print(f"⚠️ Could not load disease prices: {e}")
-    DISEASE_PRICES = {}
+def load_disease_prices():
+    """Load disease prices from CSV."""
+    global DISEASE_PRICES
+    disease_prices_path = os.path.join(BASE_DIR, "data", "disease_prices.csv")
+    
+    try:
+        if os.path.exists(disease_prices_path):
+            df_prices = pd.read_csv(disease_prices_path)
+            for _, row in df_prices.iterrows():
+                DISEASE_PRICES[str(row['diagnosis_code'])] = {
+                    'base_price': float(row['avg_price']),
+                    'median_price': float(row['median_price']),
+                    'min_price': float(row['min_price']),
+                    'max_price': float(row['max_price']),
+                    'claim_count': int(row['claim_count']),
+                    'fraud_rate': float(row['fraud_rate'])
+                }
+            print(f"✅ Loaded prices for {len(DISEASE_PRICES)} diagnoses")
+        else:
+            print(f"⚠️ Disease prices file not found: {disease_prices_path}")
+            DISEASE_PRICES = {}
+    except Exception as e:
+        print(f"⚠️ Could not load disease prices: {e}")
+        DISEASE_PRICES = {}
 
 # Provider type multipliers (hospitals can charge premium)
 PROVIDER_MULTIPLIERS = {
