@@ -1,0 +1,35 @@
+# Backend Files (Excluded for Frontend-Only Deployment)
+backend/
+api/
+ml/
+data/
+Dataset/
+requirements.txt
+*.py
+
+# Development
+venv/
+node_modules/
+__pycache__/
+.git/
+.DS_Store
+*.log
+*.zip
+
+# Large Dataset Files (Training Data)
+Dataset/*.csv
+Dataset/Test-*
+Dataset/Train-*
+
+# Keep only necessary Dataset subfolder
+!Dataset/Synthetic Dataset/
+
+# Data Folder
+data/*.csv
+data/*.db
+
+
+# Documentation
+*.pdf
+PROJECT_LOGIC.md
+README.md

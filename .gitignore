@@ -1,0 +1,43 @@
+# Environment files
+.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+.venv/
+ENV/
+
+# Large Datasets & Databases
+Dataset/
+data/*.db
+data/*.csv
+!data/disease_prices.csv
+
+.idea/
+*.swp
+*.swo
+
+# Database files (optional - uncomment if you don't want to track)
+# *.db
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Node modules (frontend)
+node_modules/
+frontend/node_modules/
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+.vercel
