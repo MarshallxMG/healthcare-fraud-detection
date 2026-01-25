@@ -15,11 +15,23 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Database configuration - use environment variables or default to local paths
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+
+# Database configuration
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{os.path.join(DATA_DIR, 'claims.db')}")
 USER_SUBMISSIONS_DB = os.getenv("USER_SUBMISSIONS_DB", f"sqlite:///{os.path.join(DATA_DIR, 'user_submissions.db')}")
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-user_engine = create_engine(USER_SUBMISSIONS_DB, connect_args={"check_same_thread": False})
+# Increase timeout to reduce "database locked" errors
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False, "timeout": 30})
+user_engine = create_engine(USER_SUBMISSIONS_DB, connect_args={"check_same_thread": False, "timeout": 30})
+
+# Enable Write-Ahead Logging (WAL) mode for better concurrency
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 UserSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=user_engine)
