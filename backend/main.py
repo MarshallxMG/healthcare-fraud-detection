@@ -145,9 +145,9 @@ load_dotenv()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow ALL origins (Vercel, Localhost, etc.) to fix connection issues
-    allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods (GET, POST, OPTIONS, etc.)
+    allow_origins=["*"],  # Allow ALL origins
+    allow_credentials=False,  # Disable credentials to allow wildcard origins safely
+    allow_methods=["*"],  # Allow all methods
     allow_headers=["*"],  # Allow all headers
 )
 
