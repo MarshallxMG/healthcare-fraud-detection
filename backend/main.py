@@ -110,15 +110,12 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Get allowed origins from environment (default to localhost for development)
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,  # Restricted to specific origins
+    allow_origins=["*"],  # Allow ALL origins (Vercel, Localhost, etc.) to fix connection issues
     allow_credentials=True,
-    allow_methods=["GET", "POST"],  # Only needed methods
-    allow_headers=["Content-Type", "Authorization"],  # Only needed headers
+    allow_methods=["*"],  # Allow all methods (GET, POST, OPTIONS, etc.)
+    allow_headers=["*"],  # Allow all headers
 )
 
 # =============================================================================
