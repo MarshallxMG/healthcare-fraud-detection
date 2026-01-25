@@ -24,39 +24,6 @@ INDIAN HEALTHCARE PRICING:
 """
 
 # =============================================================================
-# HOSPITAL SEARCH API
-# =============================================================================
-
-@app.get("/hospitals/search")
-def search_hospitals_endpoint(query: str, type: Optional[str] = None):
-    """
-    Search hospitals by name.
-    """
-    results = hospital_lookup.search_hospitals(query, type)
-    return {"hospitals": results}
-
-@app.get("/hospitals/details")
-def get_hospital_details_endpoint(name: str):
-    """
-    Get details for a specific hospital.
-    """
-    details = hospital_lookup.get_hospital_details(name)
-    if not details:
-        raise HTTPException(status_code=404, detail="Hospital not found")
-    return details
-
-@app.get("/hospitals/stats")
-def get_hospital_stats_endpoint():
-    """
-    Get statistics about the hospital database.
-    """
-    return hospital_lookup.get_hospital_stats()
-
-# =============================================================================
-# AI-POWERED CHAT ASSISTANT
-# =============================================================================
-
-# =============================================================================
 # IMPORTS
 # =============================================================================
 
@@ -150,6 +117,29 @@ app.add_middleware(
     allow_methods=["*"],  # Allow all methods
     allow_headers=["*"],  # Allow all headers
 )
+
+# =============================================================================
+# HOSPITAL SEARCH API
+# =============================================================================
+
+@app.get("/hospitals/search")
+def search_hospitals_endpoint(query: str, type: Optional[str] = None):
+    """Search hospitals by name."""
+    results = hospital_lookup.search_hospitals(query, type)
+    return {"hospitals": results}
+
+@app.get("/hospitals/details")
+def get_hospital_details_endpoint(name: str):
+    """Get details for a specific hospital."""
+    details = hospital_lookup.get_hospital_details(name)
+    if not details:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+    return details
+
+@app.get("/hospitals/stats")
+def get_hospital_stats_endpoint():
+    """Get statistics about the hospital database."""
+    return hospital_lookup.get_hospital_stats()
 
 # =============================================================================
 # DATABASE CONNECTION
