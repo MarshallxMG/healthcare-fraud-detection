@@ -29,9 +29,9 @@ INDIAN HEALTHCARE PRICING:
 
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-from .database import SessionLocal, Claim, UserSubmission, UserSessionLocal
-from .icd_lookup import get_disease_info
-from .ai_service import chat_with_ai, generate_fraud_report, get_intelligent_insights, test_ai_service
+from backend.database import SessionLocal, Claim, UserSubmission, UserSessionLocal
+from backend.icd_lookup import get_disease_info
+from backend.ai_service import chat_with_ai, generate_fraud_report, get_intelligent_insights, test_ai_service
 import pandas as pd
 from pydantic import BaseModel
 from typing import List, Optional
@@ -39,7 +39,7 @@ import joblib
 import os
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
-from . import hospital_lookup
+import backend.hospital_lookup as hospital_lookup
 
 # =============================================================================
 # CONFIGURATION
