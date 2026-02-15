@@ -17,6 +17,7 @@ Dataset/
 data/*.db
 data/*.csv
 !data/disease_prices.csv
+!data/all_diseases_list.csv
 
 .idea/
 *.swp
