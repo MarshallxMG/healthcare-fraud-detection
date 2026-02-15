@@ -159,6 +159,8 @@ def load_top_expensive_diseases():
             return df.head(10)
         except Exception as e:
             st.warning(f"Could not load diseases list: {e}")
+    else:
+        st.warning(f"Diseases file not found at: {diseases_path}")
     return None
 
 # =============================================================================
@@ -746,6 +748,7 @@ def main():
         
         st.caption(f"Disease prices loaded: {len(disease_prices)}")
         st.caption(f"ICD codes loaded: {len(icd_lookup)}")
+        st.caption(f"BASE_DIR: {BASE_DIR}")
 
 if __name__ == "__main__":
     main()
