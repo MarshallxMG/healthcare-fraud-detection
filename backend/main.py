@@ -1460,6 +1460,107 @@ async def get_insights(db: Session = Depends(get_db)):
 
 
 # =============================================================================
+# AGENTIC AI - AUTONOMOUS FRAUD INVESTIGATOR
+# =============================================================================
+
+from backend.fraud_agent import (
+    run_agent,
+    create_predict_fn,
+    create_report_fn,
+)
+from backend.hospital_lookup import search_hospitals
+from backend.ai_service import generate_fraud_report
+
+
+class AgentChatRequest(BaseModel):
+    """Request schema for the agentic AI chat."""
+    message: str
+    session_id: Optional[str] = None
+
+
+# Build reusable helper functions for the agent
+_agent_predict_fn = None
+_agent_report_fn = None
+
+
+def _get_agent_predict_fn():
+    global _agent_predict_fn
+    if _agent_predict_fn is None:
+        _agent_predict_fn = create_predict_fn(ClaimInput, predict_fraud)
+    return _agent_predict_fn
+
+
+def _get_agent_report_fn():
+    global _agent_report_fn
+    if _agent_report_fn is None:
+        _agent_report_fn = create_report_fn(generate_fraud_report)
+    return _agent_report_fn
+
+
+def _search_hospital_wrapper(query: str, hospital_type: str = None) -> dict:
+    """Wraps search_hospitals to return a dict for the agent."""
+    results = search_hospitals(query, hospital_type)
+    return {"query": query, "results_count": len(results), "hospitals": results}
+
+
+@app.post("/agent/chat")
+@limiter.limit("15/minute")
+async def agent_chat(request: Request, chat_req: AgentChatRequest):
+    """
+    🤖 AGENTIC AI: Autonomous fraud investigation agent.
+
+    The agent can autonomously:
+    - Query the claims database
+    - Run the ML fraud detection model
+    - Look up disease pricing
+    - Investigate providers
+    - Generate investigation reports
+
+    Parameters:
+    -----------
+    message : str
+        User's question or investigation request
+    session_id : str, optional
+        Session ID for conversation continuity
+
+    Returns:
+    --------
+    dict with:
+        - response: Agent's text response
+        - tools_used: List of tools the agent called
+        - session_id: Session ID for follow-up
+    """
+    try:
+        result = await run_agent(
+            user_message=chat_req.message,
+            session_id=chat_req.session_id,
+            # Dependency injection
+            db_session_factory=SessionLocal,
+            Claim_model=Claim,
+            get_disease_info_fn=get_disease_info,
+            get_expected_price_fn=get_expected_price,
+            classify_price_zone_fn=classify_price_zone,
+            predict_fn=_get_agent_predict_fn(),
+            search_hospital_fn=_search_hospital_wrapper,
+            report_fn=_get_agent_report_fn(),
+        )
+        return {
+            "success": True,
+            **result
+        }
+    except Exception as e:
+        logger.error(f"Agent error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": False,
+            "response": f"Agent encountered an error: {str(e)}",
+            "tools_used": [],
+            "session_id": chat_req.session_id or "none"
+        }
+
+
+# =============================================================================
 # END OF FILE
 # =============================================================================
 """

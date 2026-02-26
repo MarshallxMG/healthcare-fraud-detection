@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
-import { Activity, AlertTriangle, CheckCircle, ShieldAlert, DollarSign, Database, Search, Clock, UserCheck, Stethoscope, Globe, Bot, Send, Sparkles, FileText, MapPin } from 'lucide-react'
+import { Activity, AlertTriangle, CheckCircle, ShieldAlert, DollarSign, Database, Search, Clock, UserCheck, Stethoscope, Globe, Bot, Send, Sparkles, FileText, MapPin, Zap } from 'lucide-react'
 import { translations, t } from './translations'
 
 // Configuration for API - uses environment variable in production, localhost in development
@@ -25,6 +25,14 @@ function App() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsights, setAiInsights] = useState(null);
   const [generatedReport, setGeneratedReport] = useState(null);
+  
+  // Agent AI State
+  const [agentMessages, setAgentMessages] = useState([
+    { role: 'assistant', content: '🤖 **Hello! I\'m the AI Fraud Investigator.**\n\nI can autonomously investigate fraud by querying the claims database, running the ML model, looking up disease pricing, and more.\n\nTry asking me:\n- *"What are the overall fraud statistics?"*\n- *"Investigate provider PRV51234"*\n- *"What\'s the expected price for diagnosis 4019 at a Government hospital?"*\n- *"Show me the top 10 highest-amount fraud claims"*', tools_used: [] }
+  ]);
+  const [agentInput, setAgentInput] = useState('');
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentSessionId, setAgentSessionId] = useState(null);
   
   // New Claim Form State
   const [newClaim, setNewClaim] = useState({
@@ -206,6 +214,60 @@ function App() {
     setAiLoading(false);
   };
 
+  // Agent Chat Handler
+  const sendAgentMessage = async (messageOverride) => {
+    const msg = messageOverride || agentInput;
+    if (!msg.trim()) return;
+    
+    const userMessage = { role: 'user', content: msg, tools_used: [] };
+    setAgentMessages(prev => [...prev, userMessage]);
+    setAgentInput('');
+    setAgentLoading(true);
+    
+    try {
+      const res = await axios.post(`${API_URL}/agent/chat`, {
+        message: msg,
+        session_id: agentSessionId
+      });
+      
+      if (res.data.success) {
+        setAgentSessionId(res.data.session_id);
+        setAgentMessages(prev => [...prev, {
+          role: 'assistant',
+          content: res.data.response,
+          tools_used: res.data.tools_used || []
+        }]);
+      } else {
+        setAgentMessages(prev => [...prev, {
+          role: 'assistant',
+          content: '⚠️ Agent error: ' + (res.data.response || 'Unknown error'),
+          tools_used: []
+        }]);
+      }
+    } catch (error) {
+      setAgentMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '⚠️ Connection error. Please check if the backend is running on port 8000.',
+        tools_used: []
+      }]);
+    }
+    setAgentLoading(false);
+  };
+
+  // Tool name to emoji mapping
+  const toolEmoji = (name) => {
+    const map = {
+      'query_claims_database': '🔍 Database Query',
+      'run_fraud_prediction': '🧠 ML Prediction',
+      'lookup_disease_price': '💰 Price Lookup',
+      'get_provider_history': '📋 Provider History',
+      'get_fraud_statistics': '📊 Fraud Stats',
+      'search_hospital_info': '🏥 Hospital Search',
+      'generate_investigation_report': '📝 Report Generated'
+    };
+    return map[name] || name;
+  };
+
   const getRiskColor = (level) => {
     switch(level) {
       case 'Critical': return 'text-red-500 bg-red-500/20 border-red-500/30';
@@ -251,6 +313,14 @@ function App() {
               <Sparkles className="w-3 h-3 text-yellow-400" />
             </span>
           </button>
+          <button 
+            onClick={() => setActiveTab('agent')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'agent' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'}`}
+          >
+            <Bot className="w-5 h-5 flex-shrink-0" />
+            <span className="truncate">AI Investigator</span>
+            <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold flex-shrink-0 leading-none">NEW</span>
+          </button>
         </nav>
 
         {/* Language Toggle */}
@@ -281,7 +351,7 @@ function App() {
         <header className="flex justify-between items-center mb-8">
           <div>
             <h2 className="text-2xl font-bold text-white mb-1">
-              {activeTab === 'dashboard' ? 'Real-time Fraud Monitoring' : 'System Analytics'}
+              {activeTab === 'dashboard' ? 'Real-time Fraud Monitoring' : activeTab === 'agent' ? '🤖 AI Fraud Investigator' : activeTab === 'ai' ? 'AI Assistant' : 'System Analytics'}
             </h2>
             <p className="text-slate-400 text-sm">Powered by Medicare Claims Data • {stats.total_claims.toLocaleString()} records</p>
           </div>
@@ -834,71 +904,189 @@ function App() {
 
         {/* AI Assistant Tab - Temporarily Disabled */}
         {activeTab === 'ai' && (
-          <div className="space-y-6">
-            <div className="flex items-center gap-3">
-              <Bot className="w-8 h-8 text-purple-400" />
-              <h2 className="text-2xl font-bold text-white">AI Assistant</h2>
-              <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full border border-yellow-500/30">
-                Temporarily Disabled
-              </span>
-            </div>
-            
-            {/* Disabled Notice */}
-            <div className="bg-slate-800 rounded-2xl border border-yellow-500/30 p-8 text-center">
-              <div className="flex justify-center mb-6">
-                <div className="p-6 bg-yellow-500/10 rounded-full">
-                  <Bot className="w-16 h-16 text-yellow-400" />
+          <div className="text-center py-12">
+            <Bot className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-slate-400 mb-2">Legacy AI Assistant</h3>
+            <p className="text-slate-500 mb-6">This has been replaced by the new AI Investigator.</p>
+            <button onClick={() => setActiveTab('agent')} className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg transition-all font-medium">
+              Go to AI Investigator →
+            </button>
+          </div>
+        )}
+
+        {/* 🤖 AGENTIC AI INVESTIGATOR TAB */}
+        {activeTab === 'agent' && (
+          <div className="grid grid-cols-4 gap-6" style={{height: 'calc(100vh - 180px)'}}>
+            {/* Chat Panel - Takes 3 columns */}
+            <div className="col-span-3 bg-slate-800 rounded-2xl border border-slate-700 flex flex-col overflow-hidden">
+              {/* Chat Header */}
+              <div className="p-4 border-b border-slate-700 flex items-center justify-between bg-gradient-to-r from-emerald-500/10 to-cyan-500/10">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-500/20 rounded-lg">
+                    <Zap className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-white text-sm">AI Fraud Investigator</h3>
+                    <p className="text-xs text-slate-400">Autonomous agent with 7 investigation tools</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {agentSessionId && (
+                    <span className="text-[10px] px-2 py-1 bg-slate-700 text-slate-400 rounded-full font-mono">
+                      Session: {agentSessionId.slice(0, 8)}...
+                    </span>
+                  )}
+                  <button
+                    onClick={() => {
+                      setAgentMessages([agentMessages[0]]);
+                      setAgentSessionId(null);
+                    }}
+                    className="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-all"
+                  >
+                    New Session
+                  </button>
                 </div>
               </div>
-              
-              <h3 className="text-2xl font-bold text-white mb-3">
-                AI Feature Currently Unavailable
-              </h3>
-              
-              <p className="text-slate-400 mb-6 max-w-md mx-auto">
-                The AI Assistant is temporarily disabled due to API quota limits. 
-                Please provide a valid Gemini API key to enable this feature.
-              </p>
-              
-              <div className="bg-slate-900 rounded-xl p-4 mb-6 max-w-lg mx-auto">
-                <p className="text-slate-500 text-sm mb-2">To enable AI features:</p>
-                <ol className="text-left text-slate-400 text-sm space-y-2">
-                  <li className="flex items-start gap-2">
-                    <span className="text-cyan-400">1.</span>
-                    Get a new API key from Google AI Studio
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-cyan-400">2.</span>
-                    Update the .env file with your new key
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-cyan-400">3.</span>
-                    Restart the backend server
-                  </li>
-                </ol>
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                {agentMessages.map((msg, idx) => (
+                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] ${msg.role === 'user' ? 'order-2' : ''}`}>
+                      {/* Tool badges */}
+                      {msg.tools_used && msg.tools_used.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {msg.tools_used.map((tool, tIdx) => (
+                            <span key={tIdx} className="text-[10px] px-2 py-1 bg-emerald-500/15 text-emerald-400 rounded-full border border-emerald-500/20 font-medium">
+                              {toolEmoji(tool.tool)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {/* Message bubble */}
+                      <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                        msg.role === 'user'
+                          ? 'bg-cyan-500/20 text-cyan-50 border border-cyan-500/20 rounded-br-md'
+                          : 'bg-slate-700/60 text-slate-200 border border-slate-600/40 rounded-bl-md'
+                      }`}>
+                        {/* Render markdown-like bold and lists */}
+                        {msg.content.split('\n').map((line, lIdx) => {
+                          // Bold
+                          let rendered = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                          // Italic  
+                          rendered = rendered.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                          // Inline code
+                          rendered = rendered.replace(/`(.*?)`/g, '<code class="bg-slate-800 px-1 py-0.5 rounded text-cyan-400 text-xs">$1</code>');
+                          
+                          if (line.trim().startsWith('- ') || line.trim().startsWith('• ')) {
+                            return <div key={lIdx} className="pl-3 py-0.5" dangerouslySetInnerHTML={{__html: '• ' + rendered.replace(/^[\s]*[-•]\s*/, '')}} />;
+                          }
+                          if (line.trim().match(/^\d+\.\s/)) {
+                            return <div key={lIdx} className="pl-3 py-0.5" dangerouslySetInnerHTML={{__html: rendered}} />;
+                          }
+                          if (line.trim().startsWith('#')) {
+                            const level = line.match(/^#+/)[0].length;
+                            const text = rendered.replace(/^#+\s*/, '');
+                            const sizes = { 1: 'text-lg font-bold', 2: 'text-base font-semibold', 3: 'text-sm font-semibold' };
+                            return <div key={lIdx} className={`${sizes[level] || 'font-semibold'} mt-2 mb-1 text-white`} dangerouslySetInnerHTML={{__html: text}} />;
+                          }
+                          if (line.trim() === '') return <div key={lIdx} className="h-2" />;
+                          return <div key={lIdx} className="py-0.5" dangerouslySetInnerHTML={{__html: rendered}} />;
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {agentLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-slate-700/60 border border-slate-600/40 rounded-2xl rounded-bl-md px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                          <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                          <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                        </div>
+                        <span className="text-xs text-slate-400">Agent is investigating...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-              
-              <button 
-                onClick={() => setActiveTab('dashboard')}
-                className="px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg transition-all font-medium"
-              >
-                Go to Dashboard
-              </button>
+
+              {/* Input */}
+              <div className="p-4 border-t border-slate-700 bg-slate-800/80">
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value={agentInput}
+                    onChange={(e) => setAgentInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !agentLoading && sendAgentMessage()}
+                    placeholder="Ask the AI Investigator anything..."
+                    disabled={agentLoading}
+                    className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all disabled:opacity-50"
+                  />
+                  <button
+                    onClick={() => sendAgentMessage()}
+                    disabled={agentLoading || !agentInput.trim()}
+                    className="px-5 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/20 active:scale-95"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
-            
-            {/* Feature Preview - Disabled */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 text-center opacity-50">
-                <Bot className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                <p className="text-slate-400 text-sm">AI Chatbot</p>
+
+            {/* Quick Actions Sidebar */}
+            <div className="col-span-1 space-y-4">
+              {/* Quick Actions */}
+              <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
+                <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-yellow-400" />
+                  Quick Actions
+                </h4>
+                <div className="space-y-2">
+                  {[
+                    { label: '📊 Fraud Statistics', prompt: 'What are the overall fraud statistics?' },
+                    { label: '🔍 Top Fraud Claims', prompt: 'Show me the top 10 highest-amount fraudulent claims' },
+                    { label: '💰 Price Check', prompt: 'What is the expected price for diagnosis code 4019 (Hypertension) at a Government hospital vs Private hospital?' },
+                    { label: '🏥 Hospital Search', prompt: 'Search for AIIMS hospitals' },
+                    { label: '📋 Provider Probe', prompt: 'Investigate provider PRV51234 - show their full claim history and check for suspicious patterns' },
+                    { label: '🧠 Analyze Claim', prompt: 'Run fraud prediction on a claim: provider PRV001, Government hospital, diagnosis 4019, amount ₹25000, patient age 65' },
+                  ].map((action, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => sendAgentMessage(action.prompt)}
+                      disabled={agentLoading}
+                      className="w-full text-left px-3 py-2.5 bg-slate-900 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded-lg text-xs text-slate-300 hover:text-white transition-all disabled:opacity-50"
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 text-center opacity-50">
-                <FileText className="w-8 h-8 text-cyan-400 mx-auto mb-2" />
-                <p className="text-slate-400 text-sm">Report Generator</p>
-              </div>
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 text-center opacity-50">
-                <Sparkles className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                <p className="text-slate-400 text-sm">Smart Insights</p>
+
+              {/* Agent Capabilities */}
+              <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
+                <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                  Agent Tools
+                </h4>
+                <div className="space-y-1.5">
+                  {[
+                    { emoji: '🔍', name: 'Database Query' },
+                    { emoji: '🧠', name: 'ML Prediction' },
+                    { emoji: '💰', name: 'Price Lookup' },
+                    { emoji: '📋', name: 'Provider History' },
+                    { emoji: '📊', name: 'Fraud Statistics' },
+                    { emoji: '🏥', name: 'Hospital Search' },
+                    { emoji: '📝', name: 'Report Generator' },
+                  ].map((tool, idx) => (
+                    <div key={idx} className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-400">
+                      <span>{tool.emoji}</span>
+                      <span>{tool.name}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
